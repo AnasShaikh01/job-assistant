@@ -11,18 +11,22 @@ type ClerkUserData = {
 };
 
 class AuthService {
-    async syncUser(userData: ClerkUserData) {
-        // Check if user already exists
-        const [existingUser] = await db
+    async findByClerkId(clerkId: string) {
+        const [user] = await db
             .select()
             .from(users)
-            .where(eq(users.clerkId, userData.clerkId));
+            .where(eq(users.clerkId, clerkId));
+
+        return user;
+    }
+
+    async syncUser(userData: ClerkUserData) {
+        const existingUser = await this.findByClerkId(userData.clerkId);
 
         if (existingUser) {
             return existingUser;
         }
 
-        // Create new user
         const [newUser] = await db
             .insert(users)
             .values({

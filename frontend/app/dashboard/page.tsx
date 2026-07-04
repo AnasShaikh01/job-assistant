@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { authService } from "@/services/auth.service";
 
+import ResumeUploadCard from "@/components/ResumeUploadCard";
+
 export default function DashboardPage() {
     const { getToken } = useAuth();
     const { user } = useUser();
@@ -27,14 +29,17 @@ export default function DashboardPage() {
     }, [getToken]);
 
     return (
-        <main className="p-10">
-            <h1 className="text-3xl font-bold">Dashboard 🎉</h1>
+        <>
+            <main className="p-10">
+                <h1 className="text-3xl font-bold">Dashboard 🎉</h1>
 
-            <p className="mt-4">
-                Welcome, <strong>{user?.firstName}</strong>
-            </p>
+                <p className="mt-4">
+                    Welcome, <strong>{user?.firstName}</strong>
+                </p>
 
-            <p>{user?.primaryEmailAddress?.emailAddress}</p>
-        </main>
+                <p>{user?.primaryEmailAddress?.emailAddress}</p>
+            </main>
+            <ResumeUploadCard />
+        </>
     );
 }
