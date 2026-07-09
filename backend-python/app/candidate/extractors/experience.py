@@ -20,35 +20,35 @@ class ExperienceExtractor:
     BULLET_PATTERN = re.compile(r"^[•●▪◦*-]\s*")
 
     # Step 3 - Job Title Dictionary with matching scoring weights
-    JOB_TITLES = {
-        "developer",
-        "engineer",
-        "software engineer",
-        "backend developer",
-        "backend engineer",
-        "frontend developer",
-        "frontend engineer",
-        "full stack developer",
-        "full stack engineer",
-        "data scientist",
-        "data engineer",
-        "ml engineer",
-        "ai engineer",
-        "devops engineer",
-        "cloud engineer",
-        "architect",
-        "analyst",
-        "consultant",
-        "manager",
-        "lead",
-        "senior",
-        "junior",
-        "intern",
-        "research assistant",
-        "research engineer",
-        "founder",
-        "co-founder",
-        "freelancer"
+    JOB_TITLES_DICT = {
+        "software engineer": 100,
+        "backend engineer": 100,
+        "frontend engineer": 100,
+        "full stack engineer": 100,
+        "devops engineer": 100,
+        "cloud engineer": 100,
+        "ml engineer": 100,
+        "ai engineer": 100,
+        "data scientist": 100,
+        "data engineer": 100,
+        "backend developer": 95,
+        "frontend developer": 95,
+        "full stack developer": 95,
+        "architect": 90,
+        "lead": 85,
+        "senior": 85,
+        "manager": 80,
+        "consultant": 80,
+        "developer": 75,
+        "engineer": 75,
+        "analyst": 70,
+        "founder": 60,
+        "co-founder": 60,
+        "research engineer": 50,
+        "research assistant": 40,
+        "freelancer": 40,
+        "junior": 30,
+        "intern": 20
     }
 
     def __init__(self):
@@ -170,7 +170,7 @@ class ExperienceExtractor:
 
         return best_role, target_index
 
-    def _extract_company(self, lines: List[str], role: str) -> str:
+    def _extract_company(self, lines: List[str], role: str) -> Optional[str]:
         """Step 4 — Extract Company from remaining early header lines."""
         # Filter out the structural role layout line
         remaining_header_lines = [
@@ -196,7 +196,7 @@ class ExperienceExtractor:
             
         return None, None, block
 
-    def _extract_description(self, lines: List[str], role: str, company: str) -> str:
+    def _extract_description(self, lines: List[str], role: str, company: Optional[str]) -> str:
         """Step 6 — Extract Description (everything minus headers)."""
         description_lines = []
         for line in lines:

@@ -2,7 +2,7 @@ from pydantic import ValidationError
 from app.candidate.schemas import CandidateKnowledgeBase
 
 # Import Engine Components
-from app.resume.extractor import extract_text_from_file
+from app.resume.extractor import ResumeExtractor
 from app.resume.cleaner import ResumeCleaner
 from app.resume.parser import ResumeSectionParser
 from app.resume.skill_extractor import SkillExtractor
@@ -44,7 +44,7 @@ class ResumePipeline:
         """
         # Step 1: Extract text with targeted type validation
         try:
-            raw_text = extract_text_from_file(file_bytes, filename)
+            raw_text = ResumeExtractor.extract(file_bytes, filename)
         except ValueError as ve:
             raise UnsupportedFileTypeError(f"File validation rejected for '{filename}': {str(ve)}")
         except Exception as e:

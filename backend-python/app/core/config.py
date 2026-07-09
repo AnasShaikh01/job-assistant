@@ -1,8 +1,9 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    APP_NAME: str = "Job Assistant AI Backend"
+    PROJECT_NAME: str = "Job Assistant AI API"
     VERSION: str = "1.0.0"
+    API_V1_STR: str = "/api/v1"
 
     class Config:
         env_file = ".env"
