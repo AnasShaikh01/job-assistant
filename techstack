@@ -4,3 +4,9 @@ Backend (For Processing) - Python
 
 Database - NeonDB
 Storage - Supabase S3
+
+
+
+/ - Home Page
+/dasboard - Dashboard
+/profile - Profile Page
