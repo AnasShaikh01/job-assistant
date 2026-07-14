@@ -5,7 +5,7 @@ from app.candidate.schemas import CandidateKnowledgeBase
 from app.resume.extractor import ResumeExtractor
 from app.resume.cleaner import ResumeCleaner
 from app.resume.parser import ResumeSectionParser
-from app.resume.skill_extractor import SkillExtractor
+from app.shared.skill_extractor import SkillExtractor
 from app.candidate.builder import CandidateBuilder
 
 # Custom Exceptions for Structured Control Flow

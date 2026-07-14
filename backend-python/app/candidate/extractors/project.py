@@ -1,7 +1,7 @@
 import re
 from typing import List, Tuple, Optional
 from app.candidate.schemas import Project
-from app.resume.skill_extractor import SkillExtractor
+from app.shared.skill_extractor import SkillExtractor
 
 class ProjectExtractor:
     """
