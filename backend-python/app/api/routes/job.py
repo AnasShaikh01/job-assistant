@@ -9,8 +9,7 @@ from app.jobs.pipeline import JobPipeline, JobProcessingError
 # Set up module-level logger
 logger = logging.getLogger(__name__)
 
-# Prefix aligns with standard REST v1 standards
-router = APIRouter(prefix="/api/v1/job", tags=["Job Engine"])
+router = APIRouter()
 
 # Instantiate the pipeline once at module load. 
 # This prevents reloading the heavy spaCy model into memory on every single API request.

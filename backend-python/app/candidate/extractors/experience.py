@@ -2,7 +2,7 @@ import re
 from typing import List, Tuple, Optional
 
 from app.candidate.schemas import Experience
-from app.resume.skill_extractor import SkillExtractor
+from app.shared.skill_extractor import SkillExtractor
 
 class ExperienceExtractor:
     """

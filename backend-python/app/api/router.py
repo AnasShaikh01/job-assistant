@@ -10,6 +10,4 @@ api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(resume.router, prefix="/resume", tags=["resume"])
 
 # Register the job parsing endpoint
-# Note: Since we defined prefix="/api/v1/job" and tags=["Job Engine"] inside job.py, 
-# we don't need to pass them here again.
-api_router.include_router(job.router)
+api_router.include_router(job.router, prefix="/job", tags=["Job Engine"])
