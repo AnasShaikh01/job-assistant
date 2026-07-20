@@ -25,6 +25,8 @@ class Education(BaseModel):
 
 class Project(BaseModel):
     title: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
     description: Optional[str] = None
     technologies: List[str] = Field(default_factory=list)
     github: Optional[str] = None
