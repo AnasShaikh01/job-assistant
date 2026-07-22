@@ -9,7 +9,7 @@ class StorageService {
 
         await s3Client.send(
             new PutObjectCommand({
-                Bucket: process.env.SUPABASE_S3_BUCKET!,
+                Bucket: process.env.SUPABASE_RESUME_BUCKET!,
                 Key: storageKey,
                 Body: file.buffer,
                 ContentType: file.mimetype,
@@ -19,20 +19,46 @@ class StorageService {
         return { storageKey };
     }
 
-    async createSignedUrl(storageKey: string, expiresInSeconds: number = 3600) {
+    async uploadJobDescription(
+        file: Express.Multer.File,
+        userId: string,
+        jobFileId: string
+    ) {
+        const extension = file.originalname.split(".").pop();
+        const storageKey = `users/${userId}/${jobFileId}.${extension}`;
+
+        await s3Client.send(
+            new PutObjectCommand({
+                Bucket: process.env.SUPABASE_JOB_BUCKET!,
+                Key: storageKey,
+                Body: file.buffer,
+                ContentType: file.mimetype,
+            })
+        );
+
+        return { storageKey };
+    }
+
+    async createSignedUrl(
+        bucket: string,
+        storageKey: string,
+        expiresInSeconds: number = 3600
+    ) {
         const command = new GetObjectCommand({
-            Bucket: process.env.SUPABASE_S3_BUCKET!,
+            Bucket: bucket,
             Key: storageKey,
         });
 
-        return await getSignedUrl(s3Client, command, { expiresIn: expiresInSeconds });
+        return await getSignedUrl(s3Client, command, {
+            expiresIn: expiresInSeconds,
+        });
     }
 
     // NEW: Rollback method to delete the orphan file
     async deleteResume(storageKey: string) {
         await s3Client.send(
             new DeleteObjectCommand({
-                Bucket: process.env.SUPABASE_S3_BUCKET!,
+                Bucket: process.env.SUPABASE_RESUME_BUCKET!,
                 Key: storageKey,
             })
         );

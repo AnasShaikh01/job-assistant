@@ -40,8 +40,10 @@ class ResumeService {
             await resumeRepository.updateProcessingStatus(resume.id, "PROCESSING");
 
             // Generate URL & Call Python
-            const fileUrl = await storageService.createSignedUrl(storageKey);
-            const pythonResponse = await pythonService.parseResume(
+            const fileUrl = await storageService.createSignedUrl(
+                process.env.SUPABASE_RESUME_BUCKET!,
+                storageKey
+            ); const pythonResponse = await pythonService.parseResume(
                 resume.id,
                 fileUrl,
                 file.originalname
