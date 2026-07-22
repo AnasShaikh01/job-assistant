@@ -6,12 +6,7 @@ Database - NeonDB
 Storage - Supabase S3
 
 
-
-/ - Home Page
-/dasboard - Dashboard
-/profile - Profile Page
-
-
+/test - Manual Testing
 
 
 Frontend - 
@@ -41,7 +36,6 @@ CLERK_SECRET_KEY=sk_test_N8IDowbKrqrNVLtwHxHyMGLvrIO9R58UDvShVtdT1p
 
 SUPABASE_URL=https://znntekakcnguulecllxw.storage.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpubnRla2FrY25ndXVsZWNsbHh3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MzE0OTYwNiwiZXhwIjoyMDk4NzI1NjA2fQ.Zafz_8Q4WxmNS9JjIffYI8ePlbp9m0LwIaWAcGv_dZg
-
 
 SUPABASE_S3_ENDPOINT=https://znntekakcnguulecllxw.storage.supabase.co/storage/v1/s3
 SUPABASE_S3_REGION=ap-northeast-1
