@@ -51,6 +51,54 @@ class PythonService {
             throw error;
         }
     }
+
+    async parseJobFromUrl(url: string) {
+        try {
+            const response = await axios.post(
+                `${PYTHON_API_URL}/api/v1/job/parse`,
+                {
+                    source_type: "url",
+                    content: url,
+                },
+                {
+                    timeout: 60000,
+                }
+            );
+
+            return response.data;
+        } catch (error: any) {
+            console.error(
+                "Error communicating with Python API:",
+                error?.response?.data || error.message
+            );
+
+            throw error;
+        }
+    }
+
+    async parseJobFromText(text: string) {
+        try {
+            const response = await axios.post(
+                `${PYTHON_API_URL}/api/v1/job/parse`,
+                {
+                    source_type: "text",
+                    content: text,
+                },
+                {
+                    timeout: 60000,
+                }
+            );
+
+            return response.data;
+        } catch (error: any) {
+            console.error(
+                "Error communicating with Python API:",
+                error?.response?.data || error.message
+            );
+
+            throw error;
+        }
+    }
 }
 
 export const pythonService = new PythonService();

@@ -21,3 +21,37 @@ export const uploadJobDescription = async (
 
     return response.data;
 };
+
+export const parseJobFromUrl = async (
+    token: string,
+    url: string
+) => {
+    const response = await api.post(
+        "/jobs/url",
+        { url },
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+
+    return response.data;
+};
+
+export const parseJobFromText = async (
+    token: string,
+    text: string
+) => {
+    const response = await api.post(
+        "/jobs/text",
+        { text },
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        }
+    );
+
+    return response.data;
+};  

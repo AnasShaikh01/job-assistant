@@ -45,6 +45,28 @@ class JobsService {
             throw err;
         }
     }
+
+    async parseJobFromUrl(url: string) {
+        try {
+            const pythonResponse = await pythonService.parseJobFromUrl(url);
+
+            return pythonResponse;
+        } catch (err) {
+            console.error("Python parse failed:", err);
+            throw err;
+        }
+    }
+
+    async parseJobFromText(text: string) {
+        try {
+            const pythonResponse = await pythonService.parseJobFromText(text);
+
+            return pythonResponse;
+        } catch (err) {
+            console.error("Python parse failed:", err);
+            throw err;
+        }
+    }
 }
 
 export const jobsService = new JobsService();

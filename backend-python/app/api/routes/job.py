@@ -1,7 +1,7 @@
 import logging
+import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.concurrency import run_in_threadpool
-
 from app.jobs.schemas import JobParseRequest, JobKnowledgeBase
 from app.jobs.extractor import JobExtractorFactory
 from app.jobs.pipeline import JobPipeline, JobProcessingError
@@ -39,7 +39,14 @@ async def parse_job(request: JobParseRequest):
         # Pipeline errors: Empty text extracted, Pydantic validation failures
         raise HTTPException(status_code=422, detail=str(jpe))
         
-    except Exception as e:
-        # Unhandled server errors (logged for debugging with full stack trace)
-        logger.exception("Unhandled Job Engine Error")
-        raise HTTPException(status_code=500, detail="An unexpected error occurred while parsing the job description.")
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 429:
+            raise HTTPException(
+            status_code=429,
+            detail="This website blocks automated scraping. Please use the PDF upload or paste the job description instead."
+        )
+
+        raise HTTPException(
+        status_code=e.response.status_code,
+        detail=f"Failed to fetch the job posting ({e.response.status_code})."
+        )
