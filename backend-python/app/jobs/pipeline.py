@@ -1,79 +1,89 @@
-from pydantic import ValidationError
-from .schemas import JobKnowledgeBase
-
-# Import Job Engine Components
+import logging
+import time
+from .schemas import JobParseRequest, JobKnowledgeBase
+from .extractor import JobExtractorFactory
 from .cleaner import JobCleaner
 from .parser import JobParser
+from .builder import JobBuilder
+from .validator import JobValidator
 from app.shared.skill_extractor import SkillExtractor
 from .keyword_extractor import KeywordExtractor
-from .builder import JobBuilder
 
-# Custom Exceptions for Structured Control Flow
+logger = logging.getLogger(__name__)
+
 class JobProcessingError(Exception):
-    """Raised when the text processing pipeline fails."""
+    """Custom exception to ensure internal stack traces don't leak to the API client."""
     pass
 
 class JobPipeline:
     """
-    Main Orchestrator for the Job Engine.
-    Coordinates the synchronous pipeline flow from raw extracted text to a 
-    validated canonical JobKnowledgeBase (JKB) instance.
+    Orchestrates the end-to-end extraction of a Job Description.
+    Strictly follows: Extractor -> Cleaner -> Parser -> ML Extractors -> Builder -> Validator.
+    Includes stage timings and global error handling.
     """
+
     def __init__(self):
-        # Initialize components once to keep pipeline execution fast
-        self.cleaner = JobCleaner()
+        # Initialize components once to keep memory footprint low
         self.parser = JobParser()
         self.skill_extractor = SkillExtractor()
         self.keyword_extractor = KeywordExtractor()
         self.builder = JobBuilder()
+        self.validator = JobValidator()
 
-    # ==========================================================
-    # Public API
-    # ==========================================================
-
-    def process(self, raw_text: str) -> JobKnowledgeBase:
-        """
-        Executes the top-down sequential processing of a job description.
-        Expects raw text (extraction I/O should be handled prior to this call).
-        """
-        if not raw_text or not raw_text.strip():
-            raise JobProcessingError("Extraction yielded empty text. Cannot process job description.")
-
+    async def process(self, request: JobParseRequest) -> JobKnowledgeBase:
         try:
-            # Step 1: Clean Text
-            clean_text = self.cleaner.clean(raw_text)
+            start_time = time.perf_counter()
 
-            # Step 2: Parse Sections
+            # 1. Fetch raw text (URL, PDF, or Text)
+            raw_text = await JobExtractorFactory.extract_raw_text(request)
+            ext_time = time.perf_counter()
+            logger.info(f"Extraction completed in {ext_time - start_time:.4f}s")
+
+            # Failsafe for empty document parsing
+            if not raw_text.strip():
+                raise ValueError("No job description could be extracted. The source may be empty or blocked.")
+
+            # 2. Clean UI remnants, boilerplate, and Unicode
+            clean_text = JobCleaner.clean(raw_text)
+            cln_time = time.perf_counter()
+            logger.info(f"Cleaning completed in {cln_time - ext_time:.4f}s")
+
+            # 3. Parse into logical sections
             sections = self.parser.parse(clean_text)
+            prs_time = time.perf_counter()
+            logger.info(f"Parsing completed in {prs_time - cln_time:.4f}s")
 
-            # Step 3: Extract Skills & Keywords
-            # We target high-signal sections to avoid noise from 'company about' or 'benefits'
-            extraction_target_text = (
-                f"{sections.get('header', '')}\n"
-                f"{sections.get('responsibilities', '')}\n"
-                f"{sections.get('qualifications', '')}\n"
-                f"{sections.get('preferred_qualifications', '')}\n"
-                f"{sections.get('skills', '')}"
-            )
+            # 4. Extract Skills & Keywords
+            # Explicitly EXCLUDE the company section so we don't extract historical tech stacks.
+            # Explicitly INCLUDE the skills section to catch dedicated tech lists.
+            target_extraction_text = "\n".join([
+                sections.get("header", ""),
+                sections.get("responsibilities", ""),
+                sections.get("qualifications", ""),
+                sections.get("preferred_qualifications", ""),
+                sections.get("skills", "")
+            ])
             
-            skills = self.skill_extractor.extract(extraction_target_text)
-            keywords = self.keyword_extractor.extract(extraction_target_text)
+            skills = self.skill_extractor.extract(target_extraction_text)
+            keywords = self.keyword_extractor.extract(target_extraction_text)
+            ml_time = time.perf_counter()
+            logger.info(f"ML Extraction completed in {ml_time - prs_time:.4f}s")
 
-            # Step 4: Build and Validate Job Knowledge Base
-            # Pydantic validation natively handles schema constraints inside the Builder
-            job_jkb = self.builder.build(sections, skills, keywords)
+            # 5. Build the raw Knowledge Base
+            raw_jkb = self.builder.build(sections, skills, keywords)
+            bld_time = time.perf_counter()
+            logger.info(f"Builder completed in {bld_time - ml_time:.4f}s")
 
-            # Step 5: Return Verified JKB Instance
-            return job_jkb
-
-        except ValidationError as ve:
-            # Future AI Fallback Integration Point:
-            # Catch validation errors here to route to an LLM fallback
-            raise JobProcessingError(f"Job Knowledge Base validation failed: {str(ve)}")
+            # 6. Validate and recover missing data
+            validated_jkb = self.validator.validate(raw_jkb, sections)
+            val_time = time.perf_counter()
+            logger.info(f"Validator completed in {val_time - bld_time:.4f}s")
             
-        except JobProcessingError:
-            # Prevent re-wrapping if a custom error is explicitly raised in the pipeline
-            raise
-            
+            logger.info(f"Total Pipeline execution: {val_time - start_time:.4f}s")
+
+            return validated_jkb
+
         except Exception as e:
-            raise JobProcessingError(f"Unexpected error during job pipeline processing: {str(e)}")
+            logger.error(f"Pipeline failed: {str(e)}")
+            # Wrap all internal errors into a predictable API exception
+            raise JobProcessingError(f"Job processing failed: {str(e)}") from e
