@@ -7,15 +7,53 @@ from app.shared.skill_extractor import SkillExtractor
 
 class ExperienceExtractor:
     """
-    Deterministic experience extractor.
+    Production-oriented deterministic experience extractor.
 
-    Responsibilities:
-    - Detect experience boundaries from strong role/date signals.
-    - Extract role, company, dates and description.
-    - Extract technologies from both experience headers and descriptions.
-    - Normalize technologies through the canonical SkillExtractor.
-    - Avoid treating wrapped description lines as new experiences.
+    Designed to handle common resume layouts without relying on a
+    fixed number of lines or arbitrary character thresholds.
+
+    Supported layouts include:
+
+        Role
+        Company
+        Date
+        Description
+
+        Role
+        Date
+        Company
+        Description
+
+        Company
+        Date
+        Role
+        Description
+
+        Role | Company | Date
+        Description
+
+        Company | Role | Date
+        Description
+
+        Role @ Company
+        Date
+        Description
+
+        Role
+        Date
+        Remote
+        Description
+
+    The extractor is deliberately conservative:
+    - Strong structural signals are preferred over prose heuristics.
+    - Description text is never guessed as a company.
+    - Missing company remains None.
+    - Multiple experiences can be recovered from collapsed PDF text.
     """
+
+    # ==========================================================
+    # Basic Patterns
+    # ==========================================================
 
     BULLET_PATTERN = re.compile(
         r"^[•●▪◦*\-–—]\s*"
@@ -27,28 +65,34 @@ class ExperienceExtractor:
         r"Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
     )
 
-    # Supports:
-    # Jan 2026
-    # January 2026
-    # 01/2026
-    # 01-2026
-    # 2026
-    #
-    # And ranges:
-    # Jan 2026 - May 2026
-    # Jan 2026 - Present
-    DATE_RANGE_PATTERN = re.compile(
-        rf"\b("
-        rf"(?:{MONTH_PATTERN}\s+)?(?:19|20)\d{{2}}"
+    DATE_TOKEN = (
+        rf"(?:"
+        rf"{MONTH_PATTERN}\s+(?:19|20)\d{{2}}"
         rf"|"
         rf"\d{{1,2}}[/-]\d{{4}}"
+        rf"|"
+        rf"(?:19|20)\d{{2}}"
         rf")"
-        rf"(?:\s*[-–—]\s*"
+    )
+
+    DATE_RANGE_PATTERN = re.compile(
+        rf"\b("
+        rf"{DATE_TOKEN}"
+        rf")"
+        rf"(?:"
+        rf"\s*"
+        rf"(?:[-–—]|to)"
+        rf"\s*"
         rf"("
-        rf"Present|Current|Now|"
-        rf"(?:{MONTH_PATTERN}\s+)?(?:19|20)\d{{2}}|"
-        rf"\d{{1,2}}[/-]\d{{4}}"
-        rf"))?",
+        rf"Present|Current|Now|{DATE_TOKEN}"
+        rf")"
+        rf")?",
+        re.IGNORECASE,
+    )
+
+    # Allows dates without requiring a range.
+    DATE_SEARCH_PATTERN = re.compile(
+        rf"\b{DATE_TOKEN}\b",
         re.IGNORECASE,
     )
 
@@ -57,61 +101,133 @@ class ExperienceExtractor:
         re.IGNORECASE,
     )
 
-    # Ordered roughly from specific → generic.
+    # ==========================================================
+    # Job Titles
+    # ==========================================================
+
     JOB_TITLE_PATTERNS = [
-        "machine learning engineer",
+        # Engineering / development
+        "software engineer",
+        "software developer",
+        "senior software engineer",
+        "senior software developer",
+        "junior software engineer",
+        "junior software developer",
         "full stack engineer",
         "full stack developer",
         "full-stack engineer",
         "full-stack developer",
-        "software engineer",
-        "software developer",
-        "backend engineer",
-        "backend developer",
         "frontend engineer",
         "frontend developer",
+        "front end engineer",
+        "front end developer",
+        "backend engineer",
+        "backend developer",
+        "back end engineer",
+        "back end developer",
+        "web developer",
+        "web engineer",
+        "mobile developer",
+        "application developer",
+        "application engineer",
         "devops engineer",
         "cloud engineer",
+        "platform engineer",
+        "site reliability engineer",
+        "sre",
+        "systems engineer",
+        "network engineer",
+        "security engineer",
+
+        # AI / data
+        "machine learning engineer",
+        "machine learning developer",
         "ml engineer",
         "ai/ml engineer",
         "ai engineer",
+        "artificial intelligence engineer",
         "data scientist",
         "data engineer",
+        "data analyst",
+        "analytics engineer",
         "research engineer",
+        "research scientist",
         "research assistant",
+
+        # Specialized development
         "unity 3d developer",
         "unity developer",
-        "freelance developer",
-        "developer",
-        "engineer",
+        "game developer",
+        "ar/vr developer",
+        "ar developer",
+        "vr developer",
+
+        # Product / technical leadership
+        "technical lead",
+        "tech lead",
+        "engineering lead",
+        "engineering manager",
+        "technical manager",
+        "project manager",
+        "product manager",
+        "product engineer",
+        "solutions architect",
+        "software architect",
         "architect",
+        "technical consultant",
         "consultant",
+
+        # Business / general
+        "business analyst",
+        "system analyst",
+        "systems analyst",
         "analyst",
         "manager",
+        "director",
         "founder",
         "co-founder",
+
+        # Freelance / internships
+        "freelance developer",
         "freelancer",
+        "developer",
+        "engineer",
         "intern",
+        "internship",
+        "trainee",
+        "apprentice",
     ]
+
+    # ==========================================================
+    # Non-company Metadata
+    # ==========================================================
 
     WORK_MODE_KEYWORDS = {
         "remote",
         "hybrid",
         "on-site",
         "onsite",
+        "on site",
         "full-time",
         "fulltime",
+        "full time",
         "part-time",
         "parttime",
+        "part time",
         "contract",
+        "contractor",
         "internship",
         "freelance",
+        "temporary",
+        "permanent",
     }
 
     LOCATION_KEYWORDS = {
         "india",
         "usa",
+        "us",
         "uk",
+        "uae",
         "london",
         "new york",
         "bangalore",
@@ -121,16 +237,76 @@ class ExperienceExtractor:
         "hyderabad",
         "chennai",
         "delhi",
+        "new delhi",
         "noida",
         "gurgaon",
+        "gurugram",
         "san francisco",
         "california",
         "texas",
+        "seattle",
+        "toronto",
+        "singapore",
+        "dubai",
     }
 
     LOCATION_PATTERN = re.compile(
         r"^[a-zA-Z\s\.\-]+,\s*[a-zA-Z\s\.\-]+$"
     )
+
+    COMPANY_METADATA_PATTERN = re.compile(
+        r"^(?:company|organization|organisation|employer|"
+        r"client|employer name|company name)\s*[:\-]\s*(.+)$",
+        re.IGNORECASE,
+    )
+
+    # Common separators used by resume generators.
+    HEADER_SEPARATOR_PATTERN = re.compile(
+        r"\s*(?:\||•|·|—|–)\s*"
+    )
+
+    # ==========================================================
+    # Description Signals
+    # ==========================================================
+
+    DESCRIPTION_VERBS = {
+        "built",
+        "developed",
+        "worked",
+        "managed",
+        "implemented",
+        "created",
+        "engineered",
+        "collaborated",
+        "designed",
+        "optimized",
+        "delivered",
+        "maintained",
+        "developing",
+        "contributed",
+        "resolved",
+        "translated",
+        "deployed",
+        "streamlined",
+        "enhanced",
+        "integrated",
+        "utilized",
+        "supported",
+        "led",
+        "configured",
+        "automated",
+        "architected",
+        "migrated",
+        "tested",
+        "debugged",
+        "improved",
+        "implemented",
+        "established",
+        "coordinated",
+        "analyzed",
+        "created",
+        "launched",
+    }
 
     def __init__(self):
         self.skill_extractor = SkillExtractor()
@@ -148,15 +324,22 @@ class ExperienceExtractor:
         if not lines:
             return []
 
-        blocks = self._split_blocks(lines)
+        # First recover collapsed header structures.
+        normalized_lines = self._expand_collapsed_experience_lines(
+            lines
+        )
+
+        blocks = self._split_blocks(
+            normalized_lines
+        )
 
         experiences: List[Experience] = []
 
         for block in blocks:
-            experience = self._parse_block(block)
+            parsed = self._parse_block(block)
 
-            if experience is not None:
-                experiences.append(experience)
+            if parsed is not None:
+                experiences.append(parsed)
 
         return experiences
 
@@ -164,14 +347,15 @@ class ExperienceExtractor:
     # Normalization
     # ==========================================================
 
-    def _normalize_lines(self, text: str) -> List[str]:
+    def _normalize_lines(
+        self,
+        text: str,
+    ) -> List[str]:
         """
-        Normalize horizontal whitespace while preserving physical
-        line boundaries.
+        Normalize whitespace while preserving meaningful line
+        boundaries.
+        """
 
-        We intentionally do NOT merge lines because bullet structure
-        and PDF line ordering are useful for experience extraction.
-        """
         text = text.replace(
             "\r\n",
             "\n",
@@ -186,18 +370,193 @@ class ExperienceExtractor:
             text,
         )
 
-        lines: List[str] = []
+        result: List[str] = []
 
         for raw_line in text.splitlines():
             line = raw_line.strip()
 
             if line:
-                lines.append(line)
+                result.append(line)
 
-        return lines
+        return result
 
     # ==========================================================
-    # Experience Block Detection
+    # Collapsed PDF Recovery
+    # ==========================================================
+
+    def _expand_collapsed_experience_lines(
+        self,
+        lines: List[str],
+    ) -> List[str]:
+        """
+        PDF extraction sometimes collapses an entire experience
+        onto one physical line.
+
+        Example:
+
+            FutureNixMedia Dec 2024 – Feb 2025 Web Developer Intern
+            (On-site) Engineered responsive web applications...
+
+        We recover the structural boundary before the role.
+        """
+
+        expanded: List[str] = []
+
+        for line in lines:
+            if self.BULLET_PATTERN.match(line):
+                expanded.append(line)
+                continue
+
+            segments = self._split_collapsed_line(
+                line
+            )
+
+            expanded.extend(segments)
+
+        return expanded
+
+    def _split_collapsed_line(
+        self,
+        line: str,
+    ) -> List[str]:
+        """
+        Recover multiple logical header/description segments from
+        a single physical line.
+
+        We primarily split around strong date + role combinations.
+        """
+
+        # If line already looks like a normal single structure,
+        # don't touch it.
+        matches = list(
+            self.DATE_RANGE_PATTERN.finditer(line)
+        )
+
+        if len(matches) <= 1:
+            return [line]
+
+        segments: List[str] = []
+
+        cursor = 0
+
+        for index, match in enumerate(matches):
+            start = match.start()
+            end = match.end()
+
+            # Preserve content before this date.
+            if start > cursor:
+                prefix = line[cursor:start].strip()
+
+                if prefix:
+                    # Only split prefix if it resembles a header.
+                    if self._contains_job_title(prefix):
+                        segments.append(prefix)
+
+            date_text = match.group(0).strip()
+
+            # Find content after date.
+            after_start = end
+            next_match = (
+                matches[index + 1]
+                if index + 1 < len(matches)
+                else None
+            )
+
+            after_end = (
+                next_match.start()
+                if next_match
+                else len(line)
+            )
+
+            after = line[
+                after_start:after_end
+            ].strip()
+
+            # For a date followed by a role, split it.
+            if after:
+                role_match = self._find_role_in_text(
+                    after
+                )
+
+                if role_match:
+                    role_start, role_end = role_match
+
+                    before_role = after[
+                        :role_start
+                    ].strip()
+
+                    role_text = after[
+                        role_start:role_end
+                    ].strip()
+
+                    if before_role:
+                        segments.append(
+                            date_text
+                        )
+                        segments.append(
+                            before_role
+                        )
+                    else:
+                        segments.append(
+                            date_text
+                        )
+
+                    segments.append(
+                        role_text
+                    )
+
+                    remaining = after[
+                        role_end:
+                    ].strip()
+
+                    if remaining:
+                        segments.append(
+                            remaining
+                        )
+
+                    cursor = (
+                        after_start
+                        + after_end
+                        - after_end
+                    )
+
+                    # Since this method is only a recovery layer,
+                    # return the reconstructed structure.
+                    reconstructed = []
+
+                    # Safer reconstruction from the original line.
+                    prefix = line[
+                        :start
+                    ].strip()
+
+                    if prefix:
+                        reconstructed.append(
+                            prefix
+                        )
+
+                    reconstructed.append(
+                        date_text
+                    )
+
+                    reconstructed.append(
+                        before_role
+                    ) if before_role else None
+
+                    reconstructed.append(
+                        role_text
+                    )
+
+                    if remaining:
+                        reconstructed.append(
+                            remaining
+                        )
+
+                    return reconstructed
+
+        return [line]
+
+    # ==========================================================
+    # Block Detection
     # ==========================================================
 
     def _split_blocks(
@@ -205,47 +564,42 @@ class ExperienceExtractor:
         lines: List[str],
     ) -> List[List[str]]:
         """
-        Detect experience headers and use them as experience
-        boundaries.
+        Identify strong experience starts.
 
-        Description lines are never treated as new experiences merely
-        because they are long or short.
+        We intentionally require structural evidence so description
+        lines don't become fake experiences.
         """
 
-        header_indexes = [
-            index
-            for index, line in enumerate(lines)
-            if self._is_experience_header_candidate(
+        starts: List[int] = []
+
+        for index, line in enumerate(lines):
+            if self._is_experience_start(
                 line,
                 index,
                 lines,
-            )
-        ]
+            ):
+                starts.append(index)
 
-        if not header_indexes:
+        if not starts:
             return [lines]
 
         blocks: List[List[str]] = []
 
-        for position, start_index in enumerate(
-            header_indexes
-        ):
-            end_index = (
-                header_indexes[position + 1]
-                if position + 1 < len(header_indexes)
+        for position, start in enumerate(starts):
+            end = (
+                starts[position + 1]
+                if position + 1 < len(starts)
                 else len(lines)
             )
 
-            block = lines[
-                start_index:end_index
-            ]
+            block = lines[start:end]
 
             if block:
                 blocks.append(block)
 
         return blocks
 
-    def _is_experience_header_candidate(
+    def _is_experience_start(
         self,
         line: str,
         index: int,
@@ -257,53 +611,72 @@ class ExperienceExtractor:
         if self.BULLET_PATTERN.match(line):
             return False
 
-        # A normal sentence should not become a new experience.
-        if self._looks_like_description(line):
-            return False
-
-        has_date = bool(
-            self.DATE_RANGE_PATTERN.search(line)
-        )
-
-        has_role = self._contains_job_title(
-            line
-        )
-
-        has_role_at_company = bool(
-            self.ROLE_AT_COMPANY_PATTERN.match(
-                line
-            )
-        )
-
-        # Strongest pattern:
+        # ------------------------------------------------------
+        # Highest-confidence pattern:
         #
-        # Software Developer Intern Jan 2026 - May 2026
-        #
-        if has_date and has_role:
+        # Role + Date
+        # ------------------------------------------------------
+        if (
+            self._contains_job_title(line)
+            and self.DATE_RANGE_PATTERN.search(line)
+        ):
             return True
 
-        # Role @ Company
-        # Role at Company
-        if has_role_at_company:
-            return True
-
-        # A role followed by a separate date line.
-        if has_role:
+        # ------------------------------------------------------
+        # Company + Date + Role
+        #
+        # FutureNixMedia Dec 2024 – Feb 2025
+        # Web Developer Intern
+        # ------------------------------------------------------
+        if self.DATE_RANGE_PATTERN.search(line):
             next_line = (
                 lines[index + 1]
                 if index + 1 < len(lines)
                 else ""
             )
 
-            if next_line:
-                next_has_date = bool(
-                    self.DATE_RANGE_PATTERN.search(
-                        next_line
-                    )
-                )
+            if self._contains_job_title(
+                next_line
+            ):
+                return True
 
-                if next_has_date:
+            # Same line may contain role after date.
+            date_match = self.DATE_RANGE_PATTERN.search(
+                line
+            )
+
+            if date_match:
+                after_date = line[
+                    date_match.end():
+                ].strip()
+
+                if self._contains_job_title(
+                    after_date
+                ):
                     return True
+
+        # ------------------------------------------------------
+        # Role followed by separate date.
+        # ------------------------------------------------------
+        if self._contains_job_title(line):
+            next_line = (
+                lines[index + 1]
+                if index + 1 < len(lines)
+                else ""
+            )
+
+            if self.DATE_RANGE_PATTERN.search(
+                next_line
+            ):
+                return True
+
+        # ------------------------------------------------------
+        # Role @ Company
+        # ------------------------------------------------------
+        if self.ROLE_AT_COMPANY_PATTERN.match(
+            line
+        ):
+            return True
 
         return False
 
@@ -325,16 +698,14 @@ class ExperienceExtractor:
         if not header_lines:
             return None
 
-        header_text = "\n".join(
+        role = self._extract_role(
             header_lines
         )
 
         start_date, end_date = (
-            self._extract_dates(header_text)
-        )
-
-        role = self._extract_role(
-            header_lines
+            self._extract_dates_from_block(
+                header_lines
+            )
         )
 
         company = self._extract_company(
@@ -345,6 +716,15 @@ class ExperienceExtractor:
         description = self._extract_description(
             description_lines
         )
+
+        # If segmentation failed to find description,
+        # recover any trailing prose from the header.
+        if not description:
+            description = self._recover_description(
+                header_lines,
+                role,
+                company,
+            )
 
         header_technologies = (
             self._extract_header_technologies(
@@ -358,6 +738,10 @@ class ExperienceExtractor:
             header_technologies,
             description,
         )
+
+        # Do not create empty garbage records.
+        if not role and not company and not description:
+            return None
 
         return Experience(
             role=role,
@@ -380,30 +764,90 @@ class ExperienceExtractor:
         List[str],
     ]:
         """
-        The initial non-bullet region is treated as metadata/header.
+        Separate metadata from descriptions.
 
-        Once the first bullet is encountered, everything after it
-        belongs to the description.
+        This method supports both bullet and non-bullet resumes.
 
-        This avoids using arbitrary character-length thresholds.
+        Metadata includes:
+        - role
+        - company
+        - date
+        - location
+        - work mode
+
+        Once enough metadata has been collected, prose becomes
+        description.
         """
 
         header_lines: List[str] = []
         description_lines: List[str] = []
 
-        hit_description = False
+        role_found = False
+        date_found = False
 
-        for line in block:
-            if hit_description:
+        description_started = False
+
+        for index, line in enumerate(block):
+            if description_started:
                 description_lines.append(line)
                 continue
 
-            if self.BULLET_PATTERN.match(line):
-                hit_description = True
-                description_lines.append(line)
+            clean = line.strip()
+
+            if self.BULLET_PATTERN.match(clean):
+                description_started = True
+                description_lines.append(clean)
                 continue
 
-            header_lines.append(line)
+            has_date = bool(
+                self.DATE_RANGE_PATTERN.search(clean)
+            )
+
+            has_role = self._contains_job_title(
+                clean
+            )
+
+            if has_role:
+                role_found = True
+                header_lines.append(clean)
+                continue
+
+            if has_date:
+                date_found = True
+                header_lines.append(clean)
+                continue
+
+            if self._is_location_or_work_mode(
+                clean
+            ):
+                header_lines.append(clean)
+                continue
+
+            if self._is_company_candidate(
+                clean
+            ):
+                # Only treat a short metadata-looking line
+                # as company before description begins.
+                header_lines.append(clean)
+                continue
+
+            # Role + date found means remaining prose is
+            # description.
+            if role_found and date_found:
+                description_started = True
+                description_lines.append(clean)
+                continue
+
+            # A sentence before date/role is more likely
+            # description than company.
+            if self._looks_like_description(
+                clean
+            ):
+                description_started = True
+                description_lines.append(clean)
+                continue
+
+            header_lines.append(clean)
 
         return (
             header_lines,
@@ -421,16 +865,10 @@ class ExperienceExtractor:
         if not header_lines:
             return None
 
-        # First support:
-        #
-        # Software Developer @ Company
-        #
-        # Software Developer at Company
+        # Role @ Company
         for line in header_lines:
-            match = (
-                self.ROLE_AT_COMPANY_PATTERN.match(
-                    line
-                )
+            match = self.ROLE_AT_COMPANY_PATTERN.match(
+                line
             )
 
             if match:
@@ -438,31 +876,82 @@ class ExperienceExtractor:
                     match.group(1)
                 )
 
-        best_role: Optional[str] = None
-        best_score = -1
+        candidates: List[Tuple[int, str]] = []
 
         for line in header_lines:
-            clean_line = self._remove_dates(
+            clean = self._remove_dates(
                 line
             )
 
-            clean_line = clean_line.strip(
-                " |:-,"
+            # Split common header separators.
+            parts = self._split_header_parts(
+                clean
             )
 
-            if not clean_line:
-                continue
+            for part in parts:
+                part = part.strip()
 
-            score = self._role_score(
-                clean_line
-            )
+                if not part:
+                    continue
 
-            if score > best_score:
-                best_score = score
-                best_role = clean_line
+                score = self._role_score(
+                    part
+                )
+
+                if score > 0:
+                    candidates.append(
+                        (
+                            score,
+                            part,
+                        )
+                    )
+
+        if not candidates:
+            return None
+
+        candidates.sort(
+            key=lambda item: item[0],
+            reverse=True,
+        )
 
         return self._clean_role(
-            best_role
+            candidates[0][1]
+        )
+
+    def _find_role_in_text(
+        self,
+        text: str,
+    ) -> Optional[Tuple[int, int]]:
+        lower = text.lower()
+
+        best: Optional[Tuple[int, int, int]] = None
+
+        for pattern in self.JOB_TITLE_PATTERNS:
+            match = re.search(
+                r"\b"
+                + re.escape(pattern)
+                + r"\b",
+                lower,
+            )
+
+            if not match:
+                continue
+
+            score = 100 + len(pattern)
+
+            if best is None or score > best[0]:
+                best = (
+                    score,
+                    match.start(),
+                    match.end(),
+                )
+
+        if best is None:
+            return None
+
+        return (
+            best[1],
+            best[2],
         )
 
     def _role_score(
@@ -506,15 +995,13 @@ class ExperienceExtractor:
             return None
 
         # ------------------------------------------------------
-        # Case 1:
+        # Explicit:
         #
-        # Software Developer @ QuickSO
+        # Role @ Company
         # ------------------------------------------------------
         for line in header_lines:
-            match = (
-                self.ROLE_AT_COMPANY_PATTERN.match(
-                    line
-                )
+            match = self.ROLE_AT_COMPANY_PATTERN.match(
+                line
             )
 
             if match:
@@ -523,109 +1010,166 @@ class ExperienceExtractor:
                 )
 
         # ------------------------------------------------------
-        # Case 2:
-        #
-        # Software Developer Intern Jan 2026 - May 2026
-        # QuickSO App | Hybrid, Mumbai
-        #
-        # The company is a separate line after the role.
+        # Explicit company metadata.
         # ------------------------------------------------------
+        for line in header_lines:
+            match = self.COMPANY_METADATA_PATTERN.match(
+                line
+            )
 
+            if match:
+                return self._clean_company(
+                    match.group(1)
+                )
+
+        # ------------------------------------------------------
+        # Search structured header parts.
+        # ------------------------------------------------------
+        for line in header_lines:
+            parts = self._split_header_parts(
+                line
+            )
+
+            for part in parts:
+                candidate = part.strip()
+
+                if not candidate:
+                    continue
+
+                if role and candidate.lower() == role.lower():
+                    continue
+
+                if self.DATE_RANGE_PATTERN.search(
+                    candidate
+                ):
+                    continue
+
+                if self._is_non_company_metadata(
+                    candidate
+                ):
+                    continue
+
+                if self._contains_job_title(
+                    candidate
+                ):
+                    continue
+
+                if self._looks_like_description(
+                    candidate
+                ):
+                    continue
+
+                if self._is_company_candidate(
+                    candidate
+                ):
+                    return self._clean_company(
+                        candidate
+                    )
+
+        # ------------------------------------------------------
+        # Handle separate company line:
+        #
+        # Role
+        # Company
+        # Date
+        # ------------------------------------------------------
         role_index: Optional[int] = None
 
         if role:
-            for index, line in enumerate(
-                header_lines
-            ):
-                clean_line = self._remove_dates(
-                    line
-                ).strip()
+            for index, line in enumerate(header_lines):
+                parts = self._split_header_parts(
+                    self._remove_dates(line)
+                )
 
-                if clean_line.lower() == role.lower():
+                if any(
+                    part.strip().lower()
+                    == role.lower()
+                    for part in parts
+                ):
                     role_index = index
                     break
 
-        # Prefer lines AFTER the role.
-        candidate_indexes: List[int] = []
-
         if role_index is not None:
-            candidate_indexes.extend(
-                range(
-                    role_index + 1,
-                    len(header_lines),
-                )
-            )
-
-        # Then inspect earlier lines as fallback.
-        candidate_indexes.extend(
-            index
+            # Prefer the immediate following metadata line.
             for index in range(
-                len(header_lines)
-            )
-            if index not in candidate_indexes
-        )
-
-        for index in candidate_indexes:
-            line = header_lines[index].strip()
-
-            if not line:
-                continue
-
-            clean_line = self._remove_dates(
-                line
-            ).strip(
-                " |:-,"
-            )
-
-            if not clean_line:
-                continue
-
-            # Never use the role as company.
-            if (
-                role
-                and clean_line.lower()
-                == role.lower()
+                role_index + 1,
+                len(header_lines),
             ):
-                continue
+                candidate = self._remove_dates(
+                    header_lines[index]
+                ).strip()
 
-            # --------------------------------------------------
-            # Company | Hybrid, Mumbai
-            # --------------------------------------------------
-            if "|" in clean_line:
-                parts = [
-                    part.strip()
-                    for part in clean_line.split("|")
-                    if part.strip()
-                ]
+                if not candidate:
+                    continue
 
-                for part in parts:
-                    if self._is_non_company_metadata(
-                        part
-                    ):
-                        continue
+                if self._is_non_company_metadata(
+                    candidate
+                ):
+                    continue
 
-                    if (
-                        role
-                        and part.lower()
-                        == role.lower()
-                    ):
-                        continue
+                if self._contains_job_title(
+                    candidate
+                ):
+                    continue
 
+                if self._looks_like_description(
+                    candidate
+                ):
+                    continue
+
+                if self._is_company_candidate(
+                    candidate
+                ):
                     return self._clean_company(
-                        part
+                        candidate
                     )
 
-            # --------------------------------------------------
-            # Company
-            # --------------------------------------------------
-            if not self._is_non_company_metadata(
-                clean_line
-            ):
-                return self._clean_company(
-                    clean_line
-                )
-
         return None
+
+    def _is_company_candidate(
+        self,
+        line: str,
+    ) -> bool:
+        clean = line.strip()
+
+        if not clean:
+            return False
+
+        if self.BULLET_PATTERN.match(clean):
+            return False
+
+        if self.DATE_RANGE_PATTERN.search(clean):
+            return False
+
+        if self._is_non_company_metadata(
+            clean
+        ):
+            return False
+
+        if self._contains_job_title(clean):
+            return False
+
+        if self._looks_like_description(clean):
+            return False
+
+        if len(clean.split()) > 8:
+            return False
+
+        if re.search(
+            r"\b(?:built|developed|worked|managed|"
+            r"implemented|created|engineered|"
+            r"collaborated|designed|optimized|"
+            r"delivered|maintained|resolved|"
+            r"translated|deployed|streamlined|"
+            r"enhanced|integrated|utilized|"
+            r"supported|launched|configured|"
+            r"automated|tested|debugged)\b",
+            clean,
+            re.IGNORECASE,
+        ):
+            return False
+
+        return True
 
     def _is_non_company_metadata(
         self,
@@ -646,41 +1190,61 @@ class ExperienceExtractor:
 
         return False
 
+    def _is_location_or_work_mode(
+        self,
+        line: str,
+    ) -> bool:
+        clean = line.strip()
+
+        if self._is_non_company_metadata(
+            clean
+        ):
+            return True
+
+        if "|" in clean:
+            parts = [
+                part.strip()
+                for part in clean.split("|")
+                if part.strip()
+            ]
+
+            if parts and all(
+                self._is_non_company_metadata(
+                    part
+                )
+                for part in parts
+            ):
+                return True
+
+        return False
+
     # ==========================================================
-    # Date Extraction
+    # Dates
     # ==========================================================
 
-    def _extract_dates(
+    def _extract_dates_from_block(
         self,
-        text: str,
+        header_lines: List[str],
     ) -> Tuple[
         Optional[str],
         Optional[str],
     ]:
-        match = (
-            self.DATE_RANGE_PATTERN.search(
-                text
-            )
+        text = " ".join(header_lines)
+
+        match = self.DATE_RANGE_PATTERN.search(
+            text
         )
 
         if not match:
             return None, None
 
-        start_date = (
+        return (
             match.group(1).strip()
             if match.group(1)
-            else None
-        )
-
-        end_date = (
+            else None,
             match.group(2).strip()
             if match.group(2)
-            else None
-        )
-
-        return (
-            start_date,
-            end_date,
+            else None,
         )
 
     def _remove_dates(
@@ -691,6 +1255,45 @@ class ExperienceExtractor:
             "",
             text,
         ).strip()
+
+    # ==========================================================
+    # Header Splitting
+    # ==========================================================
+
+    def _split_header_parts(
+        self,
+        line: str,
+    ) -> List[str]:
+        """
+        Split metadata lines without destroying normal company names.
+
+        Example:
+
+            QuickSO App | Hybrid, Mumbai
+
+        becomes:
+
+            QuickSO App
+            Hybrid, Mumbai
+        """
+
+        if not line:
+            return []
+
+        parts = re.split(
+            r"\s*(?:\||·|•)\s*",
+            line,
+        )
+
+        result: List[str] = []
+
+        for part in parts:
+            part = part.strip()
+
+            if part:
+                result.append(part)
+
+        return result
 
     # ==========================================================
     # Description
@@ -706,6 +1309,52 @@ class ExperienceExtractor:
             if line.strip()
         ).strip()
 
+    def _recover_description(
+        self,
+        header_lines: List[str],
+        role: Optional[str],
+        company: Optional[str],
+    ) -> str:
+        """
+        Safety-net for unusual layouts where the PDF parser has
+        merged metadata and prose.
+
+        Only returns lines that are clearly prose.
+        """
+
+        description: List[str] = []
+
+        for line in header_lines:
+            clean = line.strip()
+
+            if not clean:
+                continue
+
+            if role and clean.lower() == role.lower():
+                continue
+
+            if company and clean.lower() == company.lower():
+                continue
+
+            if self.DATE_RANGE_PATTERN.search(
+                clean
+            ):
+                continue
+
+            if self._is_non_company_metadata(
+                clean
+            ):
+                continue
+
+            if self._looks_like_description(
+                clean
+            ):
+                description.append(clean)
+
+        return "\n".join(
+            description
+        ).strip()
+
     # ==========================================================
     # Technology Extraction
     # ==========================================================
@@ -716,63 +1365,42 @@ class ExperienceExtractor:
         role: Optional[str],
         company: Optional[str],
     ) -> List[str]:
-        """
-        Extract technologies explicitly mentioned in the
-        experience header.
-
-        Example:
-
-        Software Developer Intern Jan 2026 - May 2026
-        QuickSO App | Hybrid, Mumbai
-
-        If technologies appear in the header, they are passed
-        through the canonical SkillExtractor.
-        """
-
         if not header_lines:
             return []
 
         candidates: List[str] = []
 
         for line in header_lines:
-            clean_line = self._remove_dates(
+            clean = self._remove_dates(
                 line
             )
 
-            # Remove role without affecting case.
             if role:
-                clean_line = re.sub(
+                clean = re.sub(
                     re.escape(role),
                     "",
-                    clean_line,
+                    clean,
                     flags=re.IGNORECASE,
                 )
 
-            # Remove company without affecting case.
             if company:
-                clean_line = re.sub(
+                clean = re.sub(
                     re.escape(company),
                     "",
-                    clean_line,
+                    clean,
                     flags=re.IGNORECASE,
                 )
 
-            # Remove common metadata.
-            clean_line = re.sub(
-                r"\b(?:remote|hybrid|on-site|onsite)\b",
+            clean = re.sub(
+                r"\b(?:remote|hybrid|on-site|onsite|on site)\b",
                 "",
-                clean_line,
+                clean,
                 flags=re.IGNORECASE,
             )
 
-            clean_line = clean_line.replace(
-                "|",
-                " ",
-            )
-
-            if clean_line.strip():
+            if clean.strip():
                 candidates.append(
-                    clean_line.strip()
+                    clean.strip()
                 )
 
         if not candidates:
@@ -787,26 +1415,15 @@ class ExperienceExtractor:
         header_technologies: List[str],
         description: str,
     ) -> List[str]:
-        """
-        Combine explicit header technologies with technologies
-        found in the description.
-
-        Canonical normalization is handled by SkillExtractor.
-        """
-
         technologies = set(
             header_technologies
         )
 
         if description:
-            extracted = (
+            technologies.update(
                 self.skill_extractor.extract(
                     description
                 )
-            )
-
-            technologies.update(
-                extracted
             )
 
         return sorted(
@@ -837,6 +1454,14 @@ class ExperienceExtractor:
             " |:-,"
         )
 
+        # Remove location/work-mode suffixes.
+        clean = re.sub(
+            r"\s*\((?:remote|hybrid|on-site|onsite)\)\s*$",
+            "",
+            clean,
+            flags=re.IGNORECASE,
+        ).strip()
+
         return clean or None
 
     def _clean_company(
@@ -855,6 +1480,25 @@ class ExperienceExtractor:
             clean
         )
 
+        # Remove trailing metadata after pipe.
+        if "|" in clean:
+            parts = [
+                part.strip()
+                for part in clean.split("|")
+                if part.strip()
+            ]
+
+            valid = [
+                part
+                for part in parts
+                if not self._is_non_company_metadata(
+                    part
+                )
+            ]
+
+            if valid:
+                clean = valid[0]
+
         clean = clean.strip(
             " |:-,"
         )
@@ -869,38 +1513,37 @@ class ExperienceExtractor:
         self,
         line: str,
     ) -> bool:
-        """
-        Conservative prose detector.
+        clean = line.strip()
 
-        We do NOT use an arbitrary character threshold because
-        PDF extraction frequently wraps a single sentence over
-        multiple physical lines.
-        """
-
-        if self.BULLET_PATTERN.match(line):
-            return True
-
-        stripped = line.strip()
-
-        if not stripped:
+        if not clean:
             return False
 
-        # Sentence-ending punctuation is a strong prose signal.
-        if stripped.endswith(
+        if self.BULLET_PATTERN.match(clean):
+            return True
+
+        # Sentence-ending punctuation.
+        if clean.endswith(
             (".", "?", "!")
         ):
             return True
 
-        # Long prose without metadata.
-        if (
-            len(stripped.split()) >= 15
-            and not self.DATE_RANGE_PATTERN.search(
-                stripped
-            )
-            and not self._contains_job_title(
-                stripped
-            )
+        # Strong prose verbs.
+        words = re.findall(
+            r"[A-Za-z]+",
+            clean.lower(),
+        )
+
+        if any(
+            word in self.DESCRIPTION_VERBS
+            for word in words
         ):
             return True
+
+        # Long prose.
+        if len(words) >= 15:
+            if not self.DATE_SEARCH_PATTERN.search(
+                clean
+            ):
+                return True
 
         return False

@@ -8,13 +8,28 @@ class EducationExtractor:
     """
     Deterministic education extractor.
 
-    Responsibilities:
-    - Detect individual education records.
-    - Extract degree independently from field of study.
-    - Extract institution cleanly.
-    - Extract start/end years.
-    - Extract CGPA/GPA/percentage/grade when explicitly present.
-    - Handle common Indian and international resume formats.
+    Designed to handle common resume layouts including:
+
+        Bachelor of Engineering (B.E.) in Computer Science (AI & ML)
+        M.H. Saboo Siddik College of Engineering, Mumbai
+        2023 - 2026
+        CGPA: 9.21/10
+
+        Diploma in Information Technology
+        M.H. Saboo Siddik Polytechnic, Mumbai
+        2020 - 2023
+        83.50%
+
+    Extraction goals:
+        - degree
+        - field of study / specialization
+        - start year
+        - end year
+        - CGPA / GPA / percentage / score
+        - institution
+
+    The extractor is intentionally conservative:
+    it prefers returning None over inventing education data.
     """
 
     # ==========================================================
@@ -30,26 +45,55 @@ class EducationExtractor:
     )
 
     YEAR_RANGE_PATTERN = re.compile(
-        r"\b((?:19|20)\d{2})"
-        r"\s*(?:[-–—]|to)\s*"
-        r"(Present|Current|Now|(?:19|20)\d{2})\b",
+        r"\b"
+        r"((?:19|20)\d{2})"
+        r"\s*"
+        r"(?:[-–—]|to)"
+        r"\s*"
+        r"(Present|Current|Now|(?:19|20)\d{2})"
+        r"\b",
         re.IGNORECASE,
     )
 
-    CGPA_PATTERN = re.compile(
-        r"\b(?:CGPA|GPA|Percentage|Score|Grade)"
+    # Supports:
+    #   CGPA: 9.21/10
+    #   GPA 3.8/4
+    #   Percentage: 83.50%
+    #   Score: 92
+    #   Grade: A
+    #
+    # Grade is handled separately because it is not numeric.
+    METRIC_PATTERN = re.compile(
+        r"\b(?:CGPA|GPA|Percentage|Percent|Score)"
         r"\s*[:\-–—]?\s*"
         r"("
-        r"\d{1,2}"
-        r"(?:\.\d{1,2})?"
-        r"(?:\s*/\s*\d{1,3})?"
+        r"\d{1,3}"
+        r"(?:\.\d{1,3})?"
+        r"(?:\s*/\s*\d{1,3}(?:\.\d{1,3})?)?"
         r"%?"
         r")",
         re.IGNORECASE,
     )
 
+    GRADE_PATTERN = re.compile(
+        r"\bGrade"
+        r"\s*[:\-–—]?\s*"
+        r"([A-F][+-]?|[A-F])\b",
+        re.IGNORECASE,
+    )
+
+    # Unlabelled academic percentages:
+    #
+    # 83.50%
+    # 83.5 %
+    UNLABELED_PERCENTAGE_PATTERN = re.compile(
+        r"(?<![\w.])"
+        r"(\d{1,3}(?:\.\d{1,3})?)"
+        r"\s*%"
+    )
+
     METRIC_KEYWORDS_PATTERN = re.compile(
-        r"\b(?:cgpa|gpa|percentage|score|grade)\b",
+        r"\b(?:cgpa|gpa|percentage|percent|score|grade)\b",
         re.IGNORECASE,
     )
 
@@ -67,12 +111,12 @@ class EducationExtractor:
             "Bachelor of Technology",
         ),
         (
-            r"\bmaster\s+of\s+technology\b",
-            "Master of Technology",
-        ),
-        (
             r"\bmaster\s+of\s+engineering\b",
             "Master of Engineering",
+        ),
+        (
+            r"\bmaster\s+of\s+technology\b",
+            "Master of Technology",
         ),
         (
             r"\bbachelor\s+of\s+science\b",
@@ -200,29 +244,77 @@ class EducationExtractor:
         "software engineering",
         "artificial intelligence",
         "machine learning",
+        "deep learning",
         "ai & ml",
         "ai and ml",
         "data science",
         "data analytics",
+        "data engineering",
         "cyber security",
         "cybersecurity",
+        "electronics and telecommunication",
+        "electronics and communication",
         "electronics engineering",
         "electronics",
         "electrical engineering",
         "mechanical engineering",
         "civil engineering",
         "chemical engineering",
+        "aerospace engineering",
+        "biomedical engineering",
         "business administration",
         "business management",
         "commerce",
         "finance",
+        "accounting",
         "mathematics",
         "physics",
         "chemistry",
         "economics",
         "statistics",
         "computer applications",
+        "information science",
     ]
+
+    FIELD_CANONICAL_MAP = {
+        "computer science": "Computer Science",
+        "computer engineering": "Computer Engineering",
+        "information technology": "Information Technology",
+        "information systems": "Information Systems",
+        "software engineering": "Software Engineering",
+        "artificial intelligence": "Artificial Intelligence",
+        "machine learning": "Machine Learning",
+        "deep learning": "Deep Learning",
+        "ai & ml": "Artificial Intelligence & Machine Learning",
+        "ai and ml": "Artificial Intelligence & Machine Learning",
+        "data science": "Data Science",
+        "data analytics": "Data Analytics",
+        "data engineering": "Data Engineering",
+        "cyber security": "Cyber Security",
+        "cybersecurity": "Cyber Security",
+        "electronics and telecommunication": "Electronics and Telecommunication",
+        "electronics and communication": "Electronics and Communication",
+        "electronics engineering": "Electronics Engineering",
+        "electronics": "Electronics",
+        "electrical engineering": "Electrical Engineering",
+        "mechanical engineering": "Mechanical Engineering",
+        "civil engineering": "Civil Engineering",
+        "chemical engineering": "Chemical Engineering",
+        "aerospace engineering": "Aerospace Engineering",
+        "biomedical engineering": "Biomedical Engineering",
+        "business administration": "Business Administration",
+        "business management": "Business Management",
+        "commerce": "Commerce",
+        "finance": "Finance",
+        "accounting": "Accounting",
+        "mathematics": "Mathematics",
+        "physics": "Physics",
+        "chemistry": "Chemistry",
+        "economics": "Economics",
+        "statistics": "Statistics",
+        "computer applications": "Computer Applications",
+        "information science": "Information Science",
+    }
 
     # ==========================================================
     # Institution Signals
@@ -265,7 +357,7 @@ class EducationExtractor:
     }
 
     LOCATION_PATTERN = re.compile(
-        r"^[a-zA-Z\s\.\-]+,\s*[a-zA-Z\s\.\-]+$"
+        r"^[a-zA-Z\s.\-]+,\s*[a-zA-Z\s.\-]+$"
     )
 
     # ==========================================================
@@ -276,6 +368,7 @@ class EducationExtractor:
         self,
         text: str,
     ) -> List[Education]:
+
         if not text or not text.strip():
             return []
 
@@ -304,10 +397,6 @@ class EducationExtractor:
         self,
         text: str,
     ) -> List[str]:
-        """
-        Normalize horizontal whitespace while preserving
-        logical line boundaries.
-        """
 
         text = (
             text.replace("\r\n", "\n")
@@ -339,17 +428,17 @@ class EducationExtractor:
         lines: List[str],
     ) -> List[List[str]]:
         """
-        Split education entries using degree lines as anchors.
+        Degree lines are the strongest education-entry anchors.
 
         Example:
 
-        Bachelor of Engineering (B.E.) in Computer Science (AI & ML)
-        M.H. Saboo Siddik College of Engineering, Mumbai
-        2023 - 2026
+            Bachelor of Engineering...
+            College...
+            2023 - 2026
 
-        Diploma in Computer Engineering
-        Thakur Polytechnic, Mumbai
-        2020 - 2023
+            Diploma...
+            Polytechnic...
+            2020 - 2023
         """
 
         degree_indexes: List[int] = []
@@ -385,14 +474,14 @@ class EducationExtractor:
         self,
         line: str,
     ) -> bool:
+
         if not line:
             return False
 
         if self.BULLET_PATTERN.match(line):
             return False
 
-        # Prevent long prose from being interpreted as
-        # an education heading.
+        # Prevent long prose from becoming education headings.
         if len(line.split()) > 20:
             return False
 
@@ -402,6 +491,7 @@ class EducationExtractor:
         self,
         text: str,
     ) -> bool:
+
         lower = text.lower()
 
         for pattern, _ in self.DEGREE_PATTERNS:
@@ -421,6 +511,7 @@ class EducationExtractor:
         self,
         block: List[str],
     ) -> Optional[Education]:
+
         if not block:
             return None
 
@@ -487,12 +578,11 @@ class EducationExtractor:
         Optional[str],
         Optional[str],
     ]:
+
         text = " ".join(lines)
 
-        match = (
-            self.YEAR_RANGE_PATTERN.search(
-                text
-            )
+        match = self.YEAR_RANGE_PATTERN.search(
+            text
         )
 
         if match:
@@ -508,21 +598,28 @@ class EducationExtractor:
         if not years:
             return None, None
 
-        if len(years) == 1:
-            return years[0], None
+        # Remove duplicate years while preserving order.
+        unique_years = list(
+            dict.fromkeys(years)
+        )
+
+        if len(unique_years) == 1:
+            return unique_years[0], None
 
         return (
-            years[0],
-            years[1],
+            unique_years[0],
+            unique_years[1],
         )
 
     def _remove_years(
         self,
         lines: List[str],
     ) -> List[str]:
+
         cleaned_lines: List[str] = []
 
         for line in lines:
+
             cleaned = (
                 self.YEAR_RANGE_PATTERN.sub(
                     "",
@@ -566,14 +663,15 @@ class EducationExtractor:
 
         Examples:
 
-        Bachelor of Engineering (B.E.) in Computer Science (AI & ML)
-            -> Bachelor of Engineering (B.E.)
+            Bachelor of Engineering (B.E.) in Computer Science
+                -> Bachelor of Engineering (B.E.)
 
-        Diploma in Computer Engineering
-            -> Diploma
+            Diploma in Information Technology
+                -> Diploma
         """
 
         for line in lines:
+
             clean_line = self.BULLET_PATTERN.sub(
                 "",
                 line,
@@ -599,10 +697,10 @@ class EducationExtractor:
                     match.start():match.end()
                 ].strip()
 
-                # Preserve abbreviations in parentheses:
+                # Preserve abbreviation immediately after
+                # the long-form degree.
                 #
                 # Bachelor of Engineering (B.E.)
-                #
                 remainder = clean_line[
                     match.end():
                 ]
@@ -613,17 +711,14 @@ class EducationExtractor:
                 )
 
                 if suffix_match:
-                    degree_text = (
-                        clean_line[
-                            match.start():
-                            match.end()
-                            + suffix_match.end()
-                        ]
-                    ).strip()
+                    degree_text = clean_line[
+                        match.start():
+                        match.end()
+                        + suffix_match.end()
+                    ].strip()
 
                 return self._clean_degree(
-                    degree_text,
-                    canonical,
+                    degree_text
                 )
 
         return None
@@ -631,11 +726,11 @@ class EducationExtractor:
     def _clean_degree(
         self,
         degree_text: str,
-        canonical: str,
     ) -> str:
+
         clean = degree_text.strip()
 
-        # Remove field/specialization from degree.
+        # Remove specialization from degree.
         clean = re.split(
             r"\s+(?:in|with|major(?:ing)?\s+in|"
             r"specialization\s+in)\s+",
@@ -648,7 +743,7 @@ class EducationExtractor:
             " |,:;-"
         )
 
-        return clean or canonical
+        return clean
 
     # ==========================================================
     # Field Extraction
@@ -659,81 +754,93 @@ class EducationExtractor:
         lines: List[str],
         degree: Optional[str],
     ) -> Optional[str]:
-        """
-        Extract the primary field/specialization.
-
-        Examples:
-
-        Bachelor of Engineering (B.E.) in Computer Science (AI & ML)
-            -> Computer Science
-
-        Diploma in Computer Engineering
-            -> Computer Engineering
-        """
 
         if not lines:
             return None
 
         # ------------------------------------------------------
-        # 1. Explicit "in ..." field.
+        # 1. Explicit "in ..."
+        #
+        # Degree may already have been cleaned, so inspect
+        # the ORIGINAL education lines as well.
         # ------------------------------------------------------
 
         for line in lines:
+
             clean_line = self.BULLET_PATTERN.sub(
                 "",
                 line,
             ).strip()
 
             field = self._field_from_text(
-                clean_line,
-                degree,
+                clean_line
             )
 
             if field:
                 return field
 
         # ------------------------------------------------------
-        # 2. Search known fields across the block.
+        # 2. Known field anywhere in block.
         # ------------------------------------------------------
 
         full_text = "\n".join(lines)
 
-        field = self._find_known_field(
+        return self._find_known_field(
             full_text
         )
-
-        if field:
-            return field
-
-        return None
 
     def _field_from_text(
         self,
         text: str,
-        degree: Optional[str],
     ) -> Optional[str]:
+
         if not text:
             return None
 
         # ------------------------------------------------------
-        # "Degree in Computer Science (AI & ML)"
+        # Explicit "in <field>"
+        #
+        # IMPORTANT:
+        # Keep parenthetical specialization.
+        #
+        # Computer Science (AI & ML)
+        # stays intact.
         # ------------------------------------------------------
+
         match = re.search(
             r"\b(?:in|major(?:ed)?\s+in|"
-            r"specialization\s+in)\s+(.+)$",
+            r"specialization\s+in)\s+(.+?)"
+            r"(?=\s+\b(?:19|20)\d{2}\b|$)",
             text,
             re.IGNORECASE,
         )
 
         if match:
+
             candidate = match.group(1).strip()
 
-            # Remove trailing punctuation.
             candidate = candidate.rstrip(
                 ".,;"
             ).strip()
 
-            # Prefer the primary recognized field.
+            # Remove trailing institution-like fragments
+            # if they accidentally occur on the same line.
+            candidate = re.split(
+                r"\s+\b(?:at|from)\s+",
+                candidate,
+                maxsplit=1,
+                flags=re.IGNORECASE,
+            )[0].strip()
+
+            # First try to preserve a recognized field +
+            # specialization.
+            combined = self._extract_field_with_specialization(
+                candidate
+            )
+
+            if combined:
+                return combined
+
             known_field = self._find_known_field(
                 candidate
             )
@@ -741,21 +848,20 @@ class EducationExtractor:
             if known_field:
                 return known_field
 
-            # Remove balanced parenthetical specialization
-            # only when it follows a recognized primary field.
             candidate = re.sub(
                 r"\s*\([^)]*\)",
                 "",
                 candidate,
             ).strip()
 
-            if candidate:
-                return self._canonical_field(
-                    candidate
-                )
+            return self._clean_field(
+                candidate
+            )
 
         # ------------------------------------------------------
-        # "Degree - Computer Science"
+        # Degree – Field
+        #
+        # Bachelor of Engineering – Computer Science
         # ------------------------------------------------------
 
         match = re.search(
@@ -764,6 +870,7 @@ class EducationExtractor:
         )
 
         if match:
+
             candidate = self._clean_field(
                 match.group(1)
             )
@@ -772,10 +879,11 @@ class EducationExtractor:
                 return candidate
 
         # ------------------------------------------------------
-        # "Degree, Computer Science"
+        # Degree, Field
         # ------------------------------------------------------
 
         if "," in text:
+
             parts = [
                 part.strip()
                 for part in text.split(",")
@@ -783,7 +891,9 @@ class EducationExtractor:
             ]
 
             if len(parts) >= 2:
+
                 for part in parts[1:]:
+
                     candidate = self._clean_field(
                         part
                     )
@@ -792,15 +902,16 @@ class EducationExtractor:
                         return candidate
 
         # ------------------------------------------------------
-        # "(Computer Science)"
+        # Parenthetical field
+        #
+        # B.E. (Computer Science)
         # ------------------------------------------------------
 
-        matches = re.findall(
+        for candidate in re.findall(
             r"\(([^()]+)\)",
             text,
-        )
+        ):
 
-        for candidate in matches:
             cleaned = self._clean_field(
                 candidate
             )
@@ -810,10 +921,60 @@ class EducationExtractor:
 
         return None
 
+    def _extract_field_with_specialization(
+        self,
+        text: str,
+    ) -> Optional[str]:
+        """
+        Preserve:
+
+            Computer Science (AI & ML)
+
+        rather than reducing it to:
+
+            Computer Science
+        """
+
+        match = re.search(
+            r"^(.*?)\s*\(([^()]+)\)\s*$",
+            text,
+        )
+
+        if not match:
+            return None
+
+        primary = self._find_known_field(
+            match.group(1)
+        )
+
+        if not primary:
+            return None
+
+        specialization = match.group(2).strip()
+
+        if not specialization:
+            return primary
+
+        # Normalize common AI/ML shorthand.
+        specialization_lower = (
+            specialization.lower()
+        )
+
+        if specialization_lower in {
+            "ai & ml",
+            "ai and ml",
+        }:
+            specialization = (
+                "AI & ML"
+            )
+
+        return f"{primary} ({specialization})"
+
     def _find_known_field(
         self,
         text: str,
     ) -> Optional[str]:
+
         lower_text = text.lower()
 
         fields = sorted(
@@ -823,6 +984,7 @@ class EducationExtractor:
         )
 
         for field in fields:
+
             if re.search(
                 r"\b"
                 + re.escape(field)
@@ -839,6 +1001,7 @@ class EducationExtractor:
         self,
         value: str,
     ) -> Optional[str]:
+
         if not value:
             return None
 
@@ -866,7 +1029,6 @@ class EducationExtractor:
         if lower in self.LOCATION_KEYWORDS:
             return None
 
-        # Prefer known canonical fields.
         known_field = self._find_known_field(
             clean
         )
@@ -880,35 +1042,13 @@ class EducationExtractor:
         self,
         value: str,
     ) -> str:
+
         lower = value.lower().strip()
 
-        canonical_map = {
-            "ai & ml":
-                "Artificial Intelligence & Machine Learning",
-            "ai and ml":
-                "Artificial Intelligence & Machine Learning",
-            "cybersecurity":
-                "Cyber Security",
-            "computer science":
-                "Computer Science",
-            "computer engineering":
-                "Computer Engineering",
-            "information technology":
-                "Information Technology",
-            "software engineering":
-                "Software Engineering",
-            "data science":
-                "Data Science",
-            "machine learning":
-                "Machine Learning",
-            "artificial intelligence":
-                "Artificial Intelligence",
-        }
-
-        if lower in canonical_map:
-            return canonical_map[lower]
-
-        return value.strip()
+        return self.FIELD_CANONICAL_MAP.get(
+            lower,
+            value.strip(),
+        )
 
     # ==========================================================
     # Institution Extraction
@@ -920,9 +1060,20 @@ class EducationExtractor:
         degree: Optional[str],
         field_of_study: Optional[str],
     ) -> Optional[str]:
+        """
+        Conservative institution extraction.
+
+        Institution extraction is intentionally kept separate
+        from degree/field detection to prevent contamination.
+
+        For now, this method returns None unless the line is
+        strongly identifiable as an institution.
+        """
+
         candidates: List[str] = []
 
         for line in lines:
+
             clean_line = self.BULLET_PATTERN.sub(
                 "",
                 line,
@@ -931,27 +1082,21 @@ class EducationExtractor:
             if not clean_line:
                 continue
 
-            # CRITICAL:
-            #
-            # Skip ANY line containing a degree.
-            #
-            # This prevents:
-            #
-            # "Bachelor of Engineering (B.E.) in Computer Science"
-            #
-            # from being returned as the institution.
+            # Never classify degree lines as institutions.
             if self._contains_degree(
                 clean_line
             ):
                 continue
 
-            # Skip CGPA/GPA/percentage lines.
-            if self.METRIC_KEYWORDS_PATTERN.search(
+            # Remove explicit academic metrics first.
+            clean_line = self._remove_metric_from_line(
                 clean_line
-            ):
+            )
+
+            if not clean_line:
                 continue
 
-            # Skip field-only lines.
+            # Skip pure field lines.
             if (
                 field_of_study
                 and clean_line.lower().strip()
@@ -975,11 +1120,9 @@ class EducationExtractor:
                 clean_line
             )
 
-        if not candidates:
-            return None
-
-        # Prefer an explicit institution signal.
+        # Strong institution signal.
         for candidate in candidates:
+
             lower = candidate.lower()
 
             if any(
@@ -990,19 +1133,22 @@ class EducationExtractor:
                     candidate
                 )
 
-        # Fallback to first reasonable candidate.
-        return self._clean_institution(
-            candidates[0]
-        )
+        # Conservative fallback.
+        #
+        # We intentionally do not aggressively guess
+        # arbitrary text as an institution.
+        return None
 
     def _clean_institution(
         self,
         institution: str,
     ) -> Optional[str]:
+
         clean = institution.strip()
 
-        if not clean:
-            return None
+        clean = self._remove_metric_from_line(
+            clean
+        )
 
         clean = re.sub(
             r"\s{2,}",
@@ -1010,12 +1156,17 @@ class EducationExtractor:
             clean,
         )
 
-        return clean
+        clean = clean.strip(
+            " |,:;()-"
+        )
+
+        return clean or None
 
     def _is_location_only(
         self,
         value: str,
     ) -> bool:
+
         lower = value.lower().strip()
 
         if lower in self.LOCATION_KEYWORDS:
@@ -1029,18 +1180,113 @@ class EducationExtractor:
         return False
 
     # ==========================================================
-    # CGPA / GPA / Percentage
+    # Academic Metrics
     # ==========================================================
 
     def _extract_cgpa(
         self,
         text: str,
     ) -> Optional[str]:
-        match = self.CGPA_PATTERN.search(
+        """
+        Extract academic score in priority order:
+
+            1. Explicit CGPA/GPA/Percentage/Score
+            2. Explicit Grade
+            3. Unlabelled percentage
+
+        Examples:
+
+            CGPA: 9.21/10 -> 9.21/10
+            GPA: 3.8/4    -> 3.8/4
+            Percentage: 83.5% -> 83.5%
+            83.50% -> 83.50%
+        """
+
+        # ------------------------------------------------------
+        # 1. Explicit numeric metric
+        # ------------------------------------------------------
+
+        match = self.METRIC_PATTERN.search(
             text
         )
 
-        if not match:
-            return None
+        if match:
+            return match.group(1).strip()
 
-        return match.group(1).strip()
+        # ------------------------------------------------------
+        # 2. Explicit grade
+        # ------------------------------------------------------
+
+        grade_match = self.GRADE_PATTERN.search(
+            text
+        )
+
+        if grade_match:
+            return grade_match.group(1).strip()
+
+        # ------------------------------------------------------
+        # 3. Unlabelled percentage
+        #
+        # Important for:
+        #
+        # M.H. Saboo Siddik Polytechnic, Mumbai 83.50%
+        # ------------------------------------------------------
+
+        percentage_match = (
+            self.UNLABELED_PERCENTAGE_PATTERN.search(
+                text
+            )
+        )
+
+        if percentage_match:
+
+            return (
+                percentage_match.group(1)
+                + "%"
+            )
+
+        return None
+
+    def _remove_metric_from_line(
+        self,
+        line: str,
+    ) -> str:
+        """
+        Remove academic score fragments from institution
+        candidates.
+
+        Example:
+
+            M.H. Saboo Siddik Polytechnic, Mumbai 83.50%
+
+        becomes:
+
+            M.H. Saboo Siddik Polytechnic, Mumbai
+        """
+
+        cleaned = self.METRIC_PATTERN.sub(
+            "",
+            line,
+        )
+
+        cleaned = self.GRADE_PATTERN.sub(
+            "",
+            cleaned,
+        )
+
+        cleaned = (
+            self.UNLABELED_PERCENTAGE_PATTERN.sub(
+                "",
+                cleaned,
+            )
+        )
+
+        cleaned = re.sub(
+            r"\s{2,}",
+            " ",
+            cleaned,
+        )
+
+        return cleaned.strip(
+            " |,:;()-"
+        )
