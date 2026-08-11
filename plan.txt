@@ -1,0 +1,20 @@
+Resume upload and management
+JD Copy Paste Job URL & JD PDF
+Persistent Candidate Profile (Resume, Projects, Skills, Portfolio)
+AI Match Score for every job
+ATS Keyword Analysis
+Missing Skills & Gap Analysis
+Tailored Cover Letter Generation
+Personalized HR/Recruiter Email
+Company Insights (Tech stack, salary, interview process, culture)
+Batch Process Multiple JDs/Job Links
+Resume Improvement Suggestions
+Dashboard with match scores, applications, and recommendations
+Top Match Job recommendations
+
+
+
+Follow-up Reminder Generator
+Daily Personalized Job Recommendations
+Interview Questions Based on the JD
+One-Click Application Package (Resume + Cover Letter + Email)

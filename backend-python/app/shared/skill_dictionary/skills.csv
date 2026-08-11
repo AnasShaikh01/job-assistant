@@ -2,159 +2,222 @@ python,
 java,
 c,
 c++,
-c#,
-javascript,
-typescript,
-r,
-go,
-ruby,
+c#,"c sharp,csharp"
+javascript,"js,ecmascript"
+typescript,"ts"
+html,"html5"
+css,"css3"
+react.js,"react,reactjs,react framework"
+next.js,"next,nextjs,next js"
+angular,"angular.js,angularjs"
+vue.js,"vue,vuejs,vue.js"
+svelte,
+node.js,"node,nodejs,node js"
+express.js,"express,expressjs"
+django,
+flask,
+fastapi,
+spring,
+spring boot,
+laravel,
 php,
+ruby,
 swift,
 kotlin,
 scala,
 perl,
 bash,
-html,
-css,
-react,react framework
-angular,
-vue,
-node.js,
-express,
-django,
-flask,
-spring,
-spring boot,
-laravel,
-tensorflow,
-pytorch,
-keras,
-scikit-learn,
-pandas,
-numpy,
-matplotlib,
-seaborn,
-plotly,
-spark,
-hadoop,
-mlflow,
-fastapi,
+r,
+go,
+
+tailwind css,"tailwind,tailwindcss,tailwind css framework"
+bootstrap,
+material ui,"mui,material-ui"
+chakra ui,"chakra,chakra-ui"
+shadcn ui,"shadcn,shadcn/ui"
+ant design,"antd,ant-design"
+
+strapi,
+medusa.js,"medusa,medusajs"
+nextauth.js,"nextauth,next auth,next-auth"
+prisma,"prisma orm"
+sequelize,
+typeorm,
+mongoose,
+
+rest api,"rest apis,restful api,restful apis,rest API"
 graphql,
-docker,
-kubernetes,
-terraform,
-jenkins,
-git,
-github,
-gitlab,
-bitbucket,
-ci/cd,
-aws,
-azure,
-gcp,
+grpc,
+soap,
+websocket,"websockets,web socket,web sockets"
+json,
+xml,
+yaml,
+oauth,"oauth 2.0,oauth2"
+jwt,"json web token,json web tokens"
+rbac,"role based access control,role-based access control"
+authentication,
+authorization,
+clerk,
+supabase,
+supabase auth,
 firebase,
-postgresql,
+passport.js,"passport,passportjs"
+
+postgresql,"postgres,postgres db"
 mysql,
-mongodb,
+mongodb,"mongo,mongo db"
 redis,
 cassandra,
 sqlite,
 oracle,
+mariadb,
 elasticsearch,
-apache kafka,
+apache kafka,"kafka"
 rabbitmq,
-data analysis,
-data visualization,
-machine learning,ml
-deep learning,dl
-natural language processing,nlp
-computer vision,
-reinforcement learning,
-artificial intelligence,ai
-big data,
-agile,
-scrum,
-project management,
-tableau,
-power bi,
-excel,
-google analytics,
-seo,
-cloud computing,
-microservices,
-rest api,
-soap,
-json,
-xml,
-unix,
-linux,
-windows,
-networking,
-security,
-blockchain,
-devops,
-anaconda,
-opencv,
-nltk,
-spacy,
-gensim,
-fasttext,
-huggingface,
-transformers,
-bert,
-gpt,
-llama,
-chatgpt,
-docker-compose,
-ansible,
-puppet,
-prometheus,
-grafana,
-jupyter,
-vscode,
-pycharm,
-intellij,
-netbeans,
+dynamodb,
+neo4j,
+
+git,
+github,
+gitlab,
+bitbucket,
+svn,"subversion"
+postman,
+insomnia,
+swagger,"openapi,open api"
+figma,
 jira,
 confluence,
 slack,
 trello,
 asana,
+vscode,"vs code,visual studio code"
+jupyter,"jupyter notebook,jupyter notebooks"
+pycharm,
+intellij,"intellij idea"
+netbeans,
 
-langchain,
-langgraph,
+vercel,
+railway,
+render,
+netlify,
+heroku,
+aws,"amazon web services"
+azure,"microsoft azure"
+gcp,"google cloud,google cloud platform"
+cloud computing,
+cloudflare,
 
-retrieval augmented generation,rag
-agentic ai,ai agents
-generative ai,genai
+docker,
+docker compose,"docker-compose,docker compose"
+kubernetes,"k8s"
+terraform,
+jenkins,
+github actions,
+gitlab ci,
+ci/cd,"ci cd,continuous integration,continuous delivery"
+ansible,
+puppet,
+prometheus,
+grafana,
+devops,
+microservices,
 
+wordpress,
+shopify,
+woocommerce,
+
+razorpay,
+stripe,
+paypal,
+
+tensorflow,
+pytorch,
+keras,
+scikit-learn,"sklearn,scikit learn"
+pandas,
+numpy,
+matplotlib,
+seaborn,
+plotly,
+opencv,
+computer vision,
+machine learning,"ml"
+deep learning,"dl"
+natural language processing,"nlp"
+reinforcement learning,
+artificial intelligence,"ai"
+generative ai,"genai,generative artificial intelligence"
+ai integration,
+ai agents,"agentic ai,agentic artificial intelligence"
 prompt engineering,
-
-vector database,vector databases
+large language model,"llm,llms,large language models"
+retrieval augmented generation,"rag,retrieval-augmented generation"
+knowledge retrieval,
+embedding models,
+sentence transformers,"sentence-transformers"
+vector database,"vector databases,vector db,vector databases"
+faiss,
 pinecone,
 chroma,
 pgvector,
 milvus,
 weaviate,
-
-large language model,llm
-large language model,llms
-
+hugging face,"huggingface"
+transformers,
+bert,
+gpt,
+llama,
+chatgpt,
 openai,
 anthropic,
 gemini,
 claude,
-
+langchain,
+langgraph,
 crewai,
 autogen,
 multi-agent systems,
 agent orchestration,
-
-embedding models,
-sentence transformers,
-faiss,
-
-knowledge retrieval,
-
 tool calling,
-function calling
+function calling,
+
+mlflow,
+spark,
+hadoop,
+big data,
+data analysis,
+data visualization,
+tableau,
+power bi,"powerbi"
+excel,
+google analytics,
+
+nltk,
+spacy,
+gensim,
+fasttext,
+anaconda,
+
+linux,
+unix,
+windows,
+networking,
+security,
+blockchain,
+
+agile,
+scrum,
+project management,
+software testing,
+quality assurance,"qa"
+test automation,
+performance optimization,
+seo,"search engine optimization"
+responsive web design,
+full stack development,
+e-commerce development,"ecommerce development,e-commerce,ecommerce"
+api integration,
+database integration,
+unity,"unity engine,unity3d,unity 3d"
