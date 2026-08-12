@@ -1,27 +1,13 @@
-// import { auth } from "@clerk/nextjs/server";
-// import { redirect } from "next/navigation";
-
-// Import all the premium landing page components we just built
 import Navbar from "@/components/layout/Navbar";
 import Hero from "@/components/landing/Hero";
 import ProblemSection from "@/components/landing/ProblemSection";
 import WorkflowSection from "@/components/landing/WorkflowSection";
 import FeatureSection from "@/components/landing/FeatureSection";
 import ProductPreview from "@/components/landing/ProductPreview";
-import PricingSection from "@/components/landing/PricingSection";
 import CTASection from "@/components/landing/CTASection";
 import Footer from "@/components/layout/Footer";
 
-export default async function Home() {
-  // Check if the user is logged in
-  // const { userId } = await auth();
-
-  // If they are logged in, send them straight to the app
-  // if (userId) {
-  //   redirect("/dashboard");
-  // }
-
-  // If they are not logged in, show them the beautiful new landing page
+export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen selection:bg-accent selection:text-primary">
       <Navbar />
@@ -32,7 +18,6 @@ export default async function Home() {
         <WorkflowSection />
         <FeatureSection />
         <ProductPreview />
-        <PricingSection />
         <CTASection />
       </main>
 
